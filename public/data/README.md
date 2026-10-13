@@ -1,3 +1,1 @@
-Merchant dataset location: `merchants.json`.
-
-This file is generated from the provided merchant CSV exports. The full source JSON should contain all 4,242 deduplicated store records. Do not manually edit one record at a time; replace the file with a newly exported dataset when updating.
+The bundled `merchants.json` is an empty starter array (`[]`). Import `Hyderabad_Merchant_Master_By_PIN.xlsx` from the site's **Import data** control, or import the CSV exports. Imported rows are saved in browser local storage on that device; they are not shared across visitors or written back to the repository.
