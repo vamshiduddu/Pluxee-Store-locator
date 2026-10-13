@@ -35,16 +35,20 @@ function App() {
         }
       }
     } catch { localStorage.removeItem('merchant-atlas-data-v1'); }
-    fetch(`${import.meta.env.BASE_URL}data/merchants.json`)
-      .then((r) => { if (!r.ok) throw new Error(`Data request failed (${r.status})`); return r.json(); })
-      .then((rows) => {
+    fetch(`${import.meta.env.BASE_URL}data/Hyderabad_Merchant_Master_By_PIN.xlsx`)
+      .then((r) => { if (!r.ok) throw new Error(`Master workbook request failed (${r.status})`); return r.arrayBuffer(); })
+      .then((buffer) => {
         if (cancelled) return;
-        const available = Array.isArray(rows) ? rows : [];
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const sheet = workbook.Sheets['Master Merchants'] || workbook.Sheets[workbook.SheetNames[0]];
+        if (!sheet) throw new Error('Master Merchants sheet was not found in the workbook.');
+        const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+        const available = rawRows.map(canonicalRow).filter((row) => row.name || row.address || row.postalCode);
         setMerchants(available);
-        if (available.length < 1000) setImportMessage('Import your master Excel workbook or merchant CSV files to load the complete directory. Your import will be saved in this browser.');
+        setImportMessage(`Loaded ${available.length.toLocaleString('en-IN')} store records automatically from the GitHub master workbook.`);
         setLoading(false);
       })
-      .catch((e) => { if (cancelled) return; setError(`${e.message}. Import a merchant CSV or Excel file to continue.`); setLoading(false); });
+      .catch((e) => { if (cancelled) return; setError(`${e.message}. Confirm the master workbook exists at public/data/Hyderabad_Merchant_Master_By_PIN.xlsx.`); setLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
