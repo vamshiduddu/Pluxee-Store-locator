@@ -24,5 +24,7 @@ npm run preview
 ## Deploy to Vercel
 Import this GitHub repository into Vercel. Use the Vite framework preset and default build command `npm run build`. Output directory: `dist`.
 
-## Dataset note
-The directory dataset was assembled from user-provided CSV exports. It contains merchant/store data and may not reflect live directory changes. Verify addresses and completeness before operational use.
+## Import your master sheet
+The initial deployment starts without a bundled merchant dataset. Use **Import data** in the site header and select the generated `Hyderabad_Merchant_Master_By_PIN.xlsx` workbook, or select multiple CSV exports. The importer reads the first worksheet (the workbook's `Master Merchants` sheet), normalizes fields, deduplicates store records and saves them in browser local storage.
+
+**Important:** imported records stay in that browser on that device; they are not uploaded to GitHub or shared between visitors. Clearing site data can remove the saved import. The app does not automatically sync edits back into the workbook or live directory.
