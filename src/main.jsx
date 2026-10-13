@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Search, MapPin, Store, Download, X, SlidersHorizontal, ExternalLink, LocateFixed, ChevronDown } from 'lucide-react';
+import { Search, MapPin, Store, Download, X, SlidersHorizontal, ExternalLink, ChevronDown, Upload, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import './styles.css';
 
 const HOME_PIN = '500068';
@@ -17,12 +18,34 @@ function App() {
   const [onlyValidPin, setOnlyValidPin] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
+  const [importMessage, setImportMessage] = useState('');
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    try {
+      const saved = localStorage.getItem('merchant-atlas-data-v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length) {
+          setMerchants(parsed);
+          setImportMessage(`Loaded ${parsed.length.toLocaleString('en-IN')} records saved in this browser.`);
+          setLoading(false);
+          return () => { cancelled = true; };
+        }
+      }
+    } catch { localStorage.removeItem('merchant-atlas-data-v1'); }
     fetch(`${import.meta.env.BASE_URL}data/merchants.json`)
       .then((r) => { if (!r.ok) throw new Error(`Data request failed (${r.status})`); return r.json(); })
-      .then((rows) => { setMerchants(rows); setLoading(false); })
-      .catch((e) => { setError(`${e.message}. Make sure public/data/merchants.json is present.`); setLoading(false); });
+      .then((rows) => {
+        if (cancelled) return;
+        const available = Array.isArray(rows) ? rows : [];
+        setMerchants(available);
+        if (available.length < 1000) setImportMessage('Import your master Excel workbook or merchant CSV files to load the complete directory. Your import will be saved in this browser.');
+        setLoading(false);
+      })
+      .catch((e) => { if (cancelled) return; setError(`${e.message}. Import a merchant CSV or Excel file to continue.`); setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   const pinOptions = useMemo(() => {
@@ -77,10 +100,91 @@ function App() {
     downloadRows(summary, 'hyderabad-pin-summary.csv');
   }
 
+  function canonicalRow(row) {
+    const key = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const indexed = new Map(Object.entries(row || {}).map(([k, v]) => [key(k), v]));
+    const pick = (...keys) => {
+      for (const k of keys) {
+        const v = indexed.get(key(k));
+        if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();
+      }
+      return '';
+    };
+    return {
+      name: pick('name', 'merchant name', 'merchant', 'business name', 'Name'),
+      secondaryID: pick('secondaryID', 'secondary id', 'secondary_id'),
+      address: pick('address', 'fullAddress', 'full address', 'business address', 'merchant address'),
+      city: pick('city', 'town'),
+      state: pick('state'),
+      postalCode: pick('postalCode', 'pin code', 'pincode', 'postal code', 'pin', 'zip code'),
+      latitude: pick('latitude', 'lat'),
+      longitude: pick('longitude', 'long', 'lng'),
+      businessID: pick('businessID', 'business id', 'business_id'),
+      storeID: pick('storeID', 'store id', 'store_id'),
+      terminalsCount: pick('terminalsCount', 'terminals count'),
+      paymentModes: pick('paymentModes', 'payment modes', 'acceptancePaymentModes'),
+      displayedAddress: pick('displayedAddress', 'displayed address', 'full displayed address')
+    };
+  }
+
+  async function importMerchantFiles(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    setImporting(true);
+    setImportMessage('');
+    setError('');
+    try {
+      const allRows = [];
+      for (const file of files) {
+        const extension = file.name.split('.').pop().toLowerCase();
+        if (!['csv', 'xlsx', 'xls', 'json'].includes(extension)) {
+          throw new Error(`Unsupported file type: ${file.name}. Select CSV, XLSX, XLS or JSON.`);
+        }
+        if (extension === 'json') {
+          const parsed = JSON.parse(await file.text());
+          if (!Array.isArray(parsed)) throw new Error(`${file.name} must contain a JSON array.`);
+          allRows.push(...parsed);
+        } else {
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: 'array', cellDates: false });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          if (!sheet) continue;
+          allRows.push(...XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false }));
+        }
+      }
+      const normalized = allRows.map(canonicalRow).filter(r => r.name || r.address || r.postalCode);
+      if (!normalized.length) throw new Error('No merchant rows found. Make sure the first row contains column headers.');
+      const unique = new Map();
+      for (const row of normalized) {
+        const id = row.secondaryID || [row.businessID, row.storeID, row.postalCode, row.address].join('|');
+        unique.set(id.toLowerCase(), row);
+      }
+      const rows = [...unique.values()];
+      try {
+        localStorage.setItem('merchant-atlas-data-v1', JSON.stringify(rows));
+      } catch {
+        throw new Error('The dataset could not fit in this browser storage. Try importing the single combined master workbook instead of several exports.');
+      }
+      setMerchants(rows);
+      setPin('');
+      setQuery('');
+      setOnlyValidPin(false);
+      setPage(1);
+      setSelected(null);
+      setImportMessage(`Imported ${rows.length.toLocaleString('en-IN')} unique store records from ${files.length} file(s). Saved in this browser.`);
+    } catch (e) {
+      setImportMessage('');
+      setError(e.message || 'Failed to import merchant data.');
+    } finally {
+      setImporting(false);
+      event.target.value = '';
+    }
+  }
+
   return <div className="app-shell">
     <header className="topbar">
       <a className="brand" href="/" aria-label="Merchant Atlas home"><span className="brand-mark"><Store size={22}/></span><span><strong>Merchant Atlas</strong><small>HYDERABAD STORE DIRECTORY</small></span></a>
-      <div className="topbar-right"><span className="live-dot"/><span>Local merchant database</span></div>
+      <div className="topbar-right"><label className="import-button"><Upload size={16}/><span>{importing ? 'Importing…' : 'Import data'}</span><input type="file" accept=".csv,.xlsx,.xls,.json" multiple onChange={importMerchantFiles} disabled={importing} /></label><span className="live-dot"/><span>Local merchant database</span></div>
     </header>
 
     <main className="main-content">
@@ -94,6 +198,7 @@ function App() {
           <div className="stat home-stat"><strong>{homeCount || '—'}</strong><span>Records in your PIN <b>{HOME_PIN}</b></span></div>
         </div>
       </section>
+      {importMessage && <div className="import-notice"><FileSpreadsheet size={16}/><span>{importMessage}</span><button onClick={() => setImportMessage('')} aria-label="Dismiss notice"><X size={14}/></button></div>}
 
       <section className="search-panel" aria-label="Merchant filters">
         <div className="panel-heading"><div><span className="section-kicker">DIRECTORY SEARCH</span><h2>What are you looking for?</h2></div><button className="text-button" onClick={() => {setPin('');setQuery('');setOnlyValidPin(false);}}><X size={15}/> Clear filters</button></div>
