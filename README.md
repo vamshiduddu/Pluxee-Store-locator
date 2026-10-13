@@ -1,12 +1,28 @@
-# Pluxee Store Locator
+# Merchant Atlas — Pluxee Store Locator
 
-A searchable directory of Pluxee merchant locations in Hyderabad, organized by PIN code.
+Search Hyderabad merchant/store records by PIN code and address.
 
-## Planned features
-- Filter merchants by PIN code
-- Search merchant name and address
-- View store/business IDs and coordinates
-- Export filtered results to CSV
+## Features
+- Filter by six-digit PIN code, including 500068
+- Search merchant name, locality, address, and IDs
+- Inspect store/business IDs, coordinates and terminal count
+- Export filtered merchants and PIN summary to CSV
+- Responsive layout for desktop and mobile
 
-## Development
-The app source and dataset will be added in the next commit.
+## Run locally
+```bash
+npm install
+npm run dev
+``
+
+## Build
+```bash
+npm run build
+npm run preview
+``
+
+## Deploy to Vercel
+Import this GitHub repository into Vercel. Use the Vite framework preset and default build command `npm run build`. Output directory: `dist`.
+
+## Dataset note
+The directory dataset was assembled from user-provided CSV exports. It contains merchant/store data and may not reflect live directory changes. Verify addresses and completeness before operational use.
