@@ -22,9 +22,16 @@ npm run preview
 ``
 
 ## Deploy to Vercel
-Import this GitHub repository into Vercel. Use the Vite framework preset and default build command `npm run build`. Output directory: `dist`.
+This repository is connected to Vercel. Commits to `main` trigger a deployment.
 
-## Import your master sheet
-The initial deployment starts without a bundled merchant dataset. Use **Import data** in the site header and select the generated `Hyderabad_Merchant_Master_By_PIN.xlsx` workbook, or select multiple CSV exports. The importer reads the first worksheet (the workbook's `Master Merchants` sheet), normalizes fields, deduplicates store records and saves them in browser local storage.
+## Master workbook
+The site automatically fetches and reads this workbook on startup:
 
-**Important:** imported records stay in that browser on that device; they are not uploaded to GitHub or shared between visitors. Clearing site data can remove the saved import. The app does not automatically sync edits back into the workbook or live directory.
+`public/data/Hyderabad_Merchant_Master_By_PIN.xlsx`
+
+**The workbook must exist at exactly that path in GitHub.** The connected GitHub write action used for this setup can write text files but cannot upload the local binary Excel workbook. Until the workbook is added at the path above, the app will show a data-loading error. To add it once, open `public/data` in GitHub, choose **Add file → Upload files**, select `Hyderabad_Merchant_Master_By_PIN.xlsx`, and commit it to `main`. Vercel will redeploy, and future visitors will load the same repository data automatically without selecting a workbook in the site.
+
+You can still use **Import data** to temporarily override the repository dataset in your own browser; those local imports are not shared with other visitors or written back to GitHub.
+
+## Dataset note
+The master workbook was generated from user-provided merchant CSV exports. It may not reflect live directory changes. Verify addresses and completeness before operational use.
